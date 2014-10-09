@@ -51,10 +51,8 @@ void setup() {
     // H = O/sin(a)
     // a = 2*PI/10, O = .5
     final float innerMagnitude = .5/sin(2*PI/10);
-    Vec3D A = new Vec3D(cos(2*PI*(i  )/5), sin(2*PI*(i  )/5), 0);
-    Vec3D B = new Vec3D(cos(2*PI*(i+1)/5), sin(2*PI*(i+1)/5), 0);
-    A = A.getNormalizedTo(innerMagnitude);  // TODO: normalize this first?
-    B = B.getNormalizedTo(innerMagnitude);
+    Vec3D A = new Vec3D(cos(2*PI*(i  )/5), sin(2*PI*(i  )/5), 0).getNormalizedTo(innerMagnitude);
+    Vec3D B = new Vec3D(cos(2*PI*(i+1)/5), sin(2*PI*(i+1)/5), 0).getNormalizedTo(innerMagnitude);
     edges.add(new Edge(A, B));
   }
 }
@@ -76,18 +74,19 @@ List<Edge> constructPentagon(Edge first, Edge second) {
     A = first.a.sub(first.b);
   }
   else {
-    A = first.b.sub(first.a);
+    A = first.b.sub(first.a).getInverted();
   }
+  
   if(second.b == intersection) {
     B = second.a.sub(second.b);
   }
   else {
-    B = second.b.sub(second.a);    
+    B = second.b.sub(second.a).getInverted();
   }
   
   // Reject this pairing if the angle between the nodes is not correct
   final float betweenAngle = (2*(PI/2 - 2*PI/10));
-  final float SMALL_AMOUNT = .0001; 
+  final float SMALL_AMOUNT = .0001;
   if(abs(A.angleBetween(B) - betweenAngle) > SMALL_AMOUNT) {
     return null;
   }
@@ -203,7 +202,9 @@ void draw() {
             // polygon first, then rotate a construction line around it to find the edges.
             // Later we will need to fill these in as triangles and perform collision detection against
             // the existing pentagons.
-            List<Edge> polygonEdges = constructPentagon(edgeA, newEdge);
+            List<Edge> polygonEdges;
+           
+            polygonEdges = constructPentagon(edgeA, newEdge);
             
             // Now, add the new edges to the list if they don't already exist...
             if(depthCount > 0) {
@@ -217,7 +218,19 @@ void draw() {
               }
             }
             
-            //constructPentagon(edgeB, newEdge);
+            polygonEdges = constructPentagon(edgeB, newEdge);
+            
+            // Now, add the new edges to the list if they don't already exist...
+            if(depthCount > 0) {
+              if(polygonEdges != null) {
+                for(Edge polygonEdge : polygonEdges) {
+                  if(!listContains(edges, polygonEdge)
+                   & !listContains(newPolygonEdges, polygonEdge)) {
+                     newPolygonEdges.add(polygonEdge);
+                   }
+                }
+              }
+            }
           }
         }
       }
