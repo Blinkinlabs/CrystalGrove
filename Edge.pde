@@ -19,14 +19,14 @@ class Edge {
   // Test if an edge touches (shares a common endpoint) with another edge
   // Returns the intersection point if they touch, or null if they do not
   Vec3D touches(Edge e) {
-    final float SMALL_DISTANCE = .0001; 
+    final float SMALL_AMOUNT = .0001; 
     
-    if(a.distanceTo(e.a) < SMALL_DISTANCE |
-       a.distanceTo(e.b) < SMALL_DISTANCE) {
+    if(a.distanceTo(e.a) < SMALL_AMOUNT |
+       a.distanceTo(e.b) < SMALL_AMOUNT) {
       return a;
     }
-    else if(b.distanceTo(e.a) < SMALL_DISTANCE |
-            b.distanceTo(e.b) < SMALL_DISTANCE) {
+    else if(b.distanceTo(e.a) < SMALL_AMOUNT |
+            b.distanceTo(e.b) < SMALL_AMOUNT) {
       return b;
     }
     else {
@@ -35,10 +35,10 @@ class Edge {
   }
   
   Boolean equals(Edge e) {
-    final float SMALL_DISTANCE = .0001; 
+    final float SMALL_AMOUNT = .0001; 
     
-    if((a.distanceTo(e.a) < SMALL_DISTANCE & b.distanceTo(e.b) < SMALL_DISTANCE)
-       | (a.distanceTo(e.b) < SMALL_DISTANCE & b.distanceTo(e.a) < SMALL_DISTANCE)) {
+    if((a.distanceTo(e.a) < SMALL_AMOUNT & b.distanceTo(e.b) < SMALL_AMOUNT)
+       | (a.distanceTo(e.b) < SMALL_AMOUNT & b.distanceTo(e.a) < SMALL_AMOUNT)) {
       return true;
     }
     

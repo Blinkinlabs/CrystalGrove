@@ -85,13 +85,15 @@ List<Edge> constructPentagon(Edge first, Edge second) {
     B = second.b.sub(second.a);    
   }
   
+  // Reject this pairing if the angle between the nodes is not correct
+  final float betweenAngle = (2*(PI/2 - 2*PI/10));
+  final float SMALL_AMOUNT = .0001; 
+  if(abs(A.angleBetween(B) - betweenAngle) > SMALL_AMOUNT) {
+    return null;
+  }
+  
   // First, take the cross product of the two edges to find the normal to the pentagon surface
   Vec3D cross = A.cross(B).normalize();
-  
-//  strokeWeight(2);
-//  stroke(0,255,0);
-//  line(intersection.x, intersection.y, intersection.z,
-//       intersection.x + cross.x, intersection.y + cross.y, intersection.z + cross.z);
   
   // Now, rotate one of the original edges about the normal so that its end lands in the center of the pentagon.
   final float centerRotateAngle = PI/2 - (2*PI/10);
@@ -101,23 +103,14 @@ List<Edge> constructPentagon(Edge first, Edge second) {
   // Use that to calculate the center of the pentagon
   Vec3D center = intersection.add(centerline);
   
-//  // Draw the centerline and the normal again, to show where we are now
-//  stroke(0,0,255);
-//  line(intersection.x, intersection.y, intersection.z,
-//       center.x,       center.y,       center.z);
-//       
-//  stroke(0,255,0);
-//  line(center.x,           center.y,           center.z,
-//       center.x + cross.x, center.y + cross.y, center.z + cross.z);
-  
   List<Edge> newEdges = new LinkedList<Edge>();
   
   final float rotationAngle = 2*PI/5;
-  for(float i = 0; i < 3; i++) {
+  for(float i = 0; i < 5; i++) {
     // Now that we have those, we can rotate one of the original edges about the center point.
     
-    Vec3D pointA = second.a.sub(center).getRotatedAroundAxis(cross, rotationAngle*(i+2)).add(center);
-    Vec3D pointB = second.b.sub(center).getRotatedAroundAxis(cross, rotationAngle*(i+2)).add(center);
+    Vec3D pointA = second.a.sub(center).getRotatedAroundAxis(cross, rotationAngle*i).add(center);
+    Vec3D pointB = second.b.sub(center).getRotatedAroundAxis(cross, rotationAngle*i).add(center);
     newEdges.add(new Edge(pointA, pointB));
   
     if(displayPolygonCandidates) {
@@ -191,20 +184,7 @@ void draw() {
           // The edge might be a duplicate, though- if it is, discard it immediately.
           // Otherwise we can schedule it for future addition. Note that we have to check
           // both current edges and new edges, because it's possible to generate the same
-          // new edge twice (todo: is this true?)
-//          Boolean duplicate = false;
-//          for(Edge edge : edges) {
-//            if(edge.equals(newEdge)) {
-//              duplicate = true;
-//              break;
-//            }
-//          }
-//          for(Edge edge : newEdges) {
-//            if(edge.equals(newEdge)) {
-//              duplicate = true;
-//              break;
-//            }
-//          }
+          // new edge twice.
           if(!listContains(edges, newEdge)
            & !listContains(newEdges, newEdge)) {
             if(depthCount > 0) {
@@ -227,12 +207,13 @@ void draw() {
             
             // Now, add the new edges to the list if they don't already exist...
             if(depthCount > 0) {
-              for(Edge polygonEdge : polygonEdges) {
-                if(!listContains(edges, polygonEdge)
-                 & !listContains(newEdges, polygonEdge)
-                 & !listContains(newPolygonEdges, polygonEdge)) {
-                   newPolygonEdges.add(polygonEdge);
-                 }
+              if(polygonEdges != null) {
+                for(Edge polygonEdge : polygonEdges) {
+                  if(!listContains(edges, polygonEdge)
+                   & !listContains(newPolygonEdges, polygonEdge)) {
+                     newPolygonEdges.add(polygonEdge);
+                   }
+                }
               }
             }
             
@@ -244,14 +225,8 @@ void draw() {
   popStyle();
   
   if(depthCount > 0) {
-    for(Edge newEdge : newEdges) {
-      edges.add(newEdge);
-    }
     for(Edge newPolygonEdge : newPolygonEdges) {
-      // Test these again because newEdges could change after newPolygonEdges is filled
-      if(!listContains(newEdges, newPolygonEdge)) {
-        edges.add(newPolygonEdge);
-      }
+      edges.add(newPolygonEdge);
     }
     depthCount = depthCount - 1;
   }
