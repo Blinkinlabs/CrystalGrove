@@ -4,9 +4,11 @@ import peasy.*;
 PeasyCam g_pCamera;
 
 // Display variables
+boolean displayEdges = true;
+boolean displayNodes = true;
 boolean displayEdgeCandidates = false;
-boolean displayPolygonCandidates = false;
-
+boolean displayPentagonCandidates = false;
+boolean displayPentagons = true;
 
 List<Edge> edges;
 List<Pentagon> pentagons;
@@ -41,6 +43,11 @@ void setup() {
   
   g_pCamera.rotateX(-1);
   
+  resetWorld();
+}
+
+// Reset to some default state
+void resetWorld() {
   edges = new LinkedList<Edge>();
   pentagons = new LinkedList<Pentagon>();
   
@@ -58,8 +65,8 @@ void setup() {
 }
 
 // Construct a pentagon given two of it's edges
-// Note that the edges have to be congruent
-List<Edge> constructPentagon(Edge first, Edge second) {
+// Note that the edges have to be congruent, and with the proper angle.
+Pentagon constructPentagon(Edge first, Edge second) {
   // Find the centerpoint
   Vec3D intersection = first.touches(second);
   if(intersection == null) {
@@ -102,7 +109,7 @@ List<Edge> constructPentagon(Edge first, Edge second) {
   // Use that to calculate the center of the pentagon
   Vec3D center = intersection.add(centerline);
   
-  List<Edge> newEdges = new LinkedList<Edge>();
+  Pentagon newPentagon = new Pentagon();
   
   final float rotationAngle = 2*PI/5;
   for(float i = 0; i < 5; i++) {
@@ -110,9 +117,9 @@ List<Edge> constructPentagon(Edge first, Edge second) {
     
     Vec3D pointA = second.a.sub(center).getRotatedAroundAxis(cross, rotationAngle*i).add(center);
     Vec3D pointB = second.b.sub(center).getRotatedAroundAxis(cross, rotationAngle*i).add(center);
-    newEdges.add(new Edge(pointA, pointB));
+    newPentagon.edges.add(new Edge(pointA, pointB));
   
-    if(displayPolygonCandidates) {
+    if(displayPentagonCandidates) {
       strokeWeight(2);
       stroke(0,200,200);
       line(pointA.x, pointA.y, pointA.z,
@@ -120,7 +127,7 @@ List<Edge> constructPentagon(Edge first, Edge second) {
     }
   }
   
-  return newEdges;
+  return newPentagon;
 }
 
 int depthCount = 0;  // Number of iterations to build the edge structures
@@ -128,108 +135,134 @@ int depthCount = 0;  // Number of iterations to build the edge structures
 void draw() {
   background(255,255,255);
   
-  List<Edge> newEdges = new LinkedList<Edge>();
-  List<Edge> newPolygonEdges = new LinkedList<Edge>();
-
   // Draw all edges
-  pushStyle();
-    strokeWeight(1);
-    for(Edge edge : edges) {
-      stroke(edge.c);
-      line(edge.a.x, edge.a.y, edge.a.z,
-           edge.b.x, edge.b.y, edge.b.z);
-    }
-  popStyle();
+  if(displayEdges) {
+    pushStyle();
+      strokeWeight(1);
+      stroke(0,0,0);
+      for(Edge edge : edges) {
+        line(edge.a.x, edge.a.y, edge.a.z,
+             edge.b.x, edge.b.y, edge.b.z);
+      }
+    popStyle();
+  }
+  
+  // Draw all pentagons
+  if(displayPentagons) {
+    pushStyle();
+      strokeWeight(1);
+      fill(100,130,250);
+      for(Pentagon pentagon : pentagons) {
+        pentagon.draw();
+      }
+    popStyle();
+  }
+  
+  List<Pentagon> newPentagons = new LinkedList<Pentagon>();
+  
+  List<Edge> newEdges = new LinkedList<Edge>();
+  List<Edge> newPentagonEdges = new LinkedList<Edge>();
   
   // For each intersection, draw the potential edges that could be built on it
   pushStyle();
     for(Edge edgeA : edges) {
       for(Edge edgeB : edges) {
-        if(edgeA.equals(edgeB)) {
-          continue;
-        }
-      
         // If the two edges share an endpoint
         Vec3D intersection = edgeA.touches(edgeB);
-        if(intersection != null) {
+        if(intersection == null) {
+          continue;
+        }
           
-          // Draw the intersection point
+        // Draw the intersection point
+        if(displayNodes) {
           strokeWeight(10);
           stroke(0,0,255);
           point(intersection.x, intersection.y, intersection.z);
+        }
+        
+        println(edgeA.pentagons.size());
+        if(edgeA.pentagons.size() > 1 | edgeB.pentagons.size() > 1) {
+          strokeWeight(10);
+          stroke(255,0,255);
+          point(intersection.x, intersection.y, intersection.z);
+          continue;
+        }
           
-          // Rotate one of the edges about the axis of the other, to form a potential new edge.
-          // We rotate to the dihedral angle, because we want to form surfaces that follow
-          // the same packing as a natural dodecahedron. Note there are multiple solutions for many
-          // of the positions. 
-          final float dihedralAngle = acos(-1/sqrt(5));
-          Vec3D C;
-          if(edgeA.b == intersection) {
-            Vec3D A = edgeA.a.sub(edgeA.b);
-            Vec3D B = edgeB.a.sub(edgeB.b);
-            C = A.getRotatedAroundAxis(B,dihedralAngle).normalize();
+        // Rotate one of the edges about the axis of the other, to form a potential new edge.
+        // We rotate to the dihedral angle, because we want to form surfaces that follow
+        // the same packing as a natural dodecahedron. Note there are multiple solutions for many
+        // of the positions. 
+        final float dihedralAngle = acos(-1/sqrt(5));
+        Vec3D C;
+        if(edgeA.b == intersection) {
+          Vec3D A = edgeA.a.sub(edgeA.b);
+          Vec3D B = edgeB.a.sub(edgeB.b);
+          C = A.getRotatedAroundAxis(B,dihedralAngle).normalize();
+        }
+        else {
+          Vec3D A = edgeA.b.sub(edgeA.a);
+          Vec3D B = edgeB.b.sub(edgeB.a);
+          C = A.getRotatedAroundAxis(B,dihedralAngle).normalize();
+        }
+        
+        // C now contains a vector displacement from the intersection of the two original
+        // edges to one of the new ones. We now form a new edge by translating it to the
+        // location of the intersection point.
+        Edge newEdge = new Edge(C.add(intersection), intersection);
+        
+        // The edge might be a duplicate, though- if it is, discard it immediately.
+        // Otherwise we can schedule it for future addition. Note that we have to check
+        // both current edges and new edges, because it's possible to generate the same
+        // new edge twice.
+        // TODO: It's possible that in the case of a corner, this might not be true.
+        if(listContains(edges, newEdge) | listContains(newEdges, newEdge)) {
+          continue;
+        }
+        
+        newEdges.add(new Edge(C.add(intersection), intersection));
+        
+        if(displayEdgeCandidates) {
+          strokeWeight(2);
+          stroke(255,0,0);
+          line(intersection.x, intersection.y, intersection.z,
+               intersection.x + C.x, intersection.y + C.y, intersection.z + C.z);
+        }
+             
+        // There are potentially two pentagons that we can construct using the new
+        // edge and one of the two original edges. To do so, let's find the center of the potential
+        // pentagon first, then rotate a construction line around it to find the edges.
+        // Later we will need to fill these in as triangles and perform collision detection against
+        // the existing pentagons.         
+        Pentagon newPentagon;
+       
+        newPentagon = constructPentagon(edgeA, newEdge);
+        
+        // Now, add the new edges to the list if they don't already exist...
+        if(depthCount > 0) {
+          if(newPentagon != null) {
+            newPentagons.add(newPentagon);
+            
+            for(Edge pentagonEdge : newPentagon.edges) {
+              if(!listContains(edges, pentagonEdge)
+               & !listContains(newPentagonEdges, pentagonEdge)) {
+                 newPentagonEdges.add(pentagonEdge);
+               }
+            }
           }
-          else {
-            Vec3D A = edgeA.b.sub(edgeA.a);
-            Vec3D B = edgeB.b.sub(edgeB.a);
-            C = A.getRotatedAroundAxis(B,dihedralAngle).normalize();
-          }
-          
-          // C now contains a vector displacement from the intersection of the two original
-          // edges to one of the new ones. We now form a new edge by translating it to the
-          // location of the intersection point.
-          Edge newEdge = new Edge(C.add(intersection), intersection);
-          
-          // The edge might be a duplicate, though- if it is, discard it immediately.
-          // Otherwise we can schedule it for future addition. Note that we have to check
-          // both current edges and new edges, because it's possible to generate the same
-          // new edge twice.
-          if(!listContains(edges, newEdge)
-           & !listContains(newEdges, newEdge)) {
-            if(depthCount > 0) {
-              newEdges.add(new Edge(C.add(intersection), intersection));
-            }
+        }
+        
+        newPentagon = constructPentagon(edgeB, newEdge);
+        
+        // Now, add the new edges to the list if they don't already exist...
+        if(depthCount > 0) {
+          if(newPentagon != null) {
+            newPentagons.add(newPentagon);
             
-            if(displayEdgeCandidates) {
-              strokeWeight(2);
-              stroke(255,0,0);
-              line(intersection.x, intersection.y, intersection.z,
-                   intersection.x + C.x, intersection.y + C.y, intersection.z + C.z);
-            }
-                 
-            // There are potentially two pentagons that we can construct using the new
-            // edge and one of the two original edges. To do so, let's find the center of the potential
-            // polygon first, then rotate a construction line around it to find the edges.
-            // Later we will need to fill these in as triangles and perform collision detection against
-            // the existing pentagons.
-            List<Edge> polygonEdges;
-           
-            polygonEdges = constructPentagon(edgeA, newEdge);
-            
-            // Now, add the new edges to the list if they don't already exist...
-            if(depthCount > 0) {
-              if(polygonEdges != null) {
-                for(Edge polygonEdge : polygonEdges) {
-                  if(!listContains(edges, polygonEdge)
-                   & !listContains(newPolygonEdges, polygonEdge)) {
-                     newPolygonEdges.add(polygonEdge);
-                   }
-                }
-              }
-            }
-            
-            polygonEdges = constructPentagon(edgeB, newEdge);
-            
-            // Now, add the new edges to the list if they don't already exist...
-            if(depthCount > 0) {
-              if(polygonEdges != null) {
-                for(Edge polygonEdge : polygonEdges) {
-                  if(!listContains(edges, polygonEdge)
-                   & !listContains(newPolygonEdges, polygonEdge)) {
-                     newPolygonEdges.add(polygonEdge);
-                   }
-                }
-              }
+            for(Edge pentagonEdge : newPentagon.edges) {
+              if(!listContains(edges, pentagonEdge)
+               & !listContains(newPentagonEdges, pentagonEdge)) {
+                 newPentagonEdges.add(pentagonEdge);
+               }
             }
           }
         }
@@ -238,22 +271,42 @@ void draw() {
   popStyle();
   
   if(depthCount > 0) {
-    for(Edge newPolygonEdge : newPolygonEdges) {
-      edges.add(newPolygonEdge);
+    for(Edge newPentagonEdge : newPentagonEdges) {
+      edges.add(newPentagonEdge);
     }
+    
+    for(Pentagon newPentagon : newPentagons) {
+      pentagons.add(newPentagon);
+      for(Edge edge : newPentagon.edges) {
+        edge.pentagons.add(newPentagon);
+      }
+    }
+    
     depthCount = depthCount - 1;
   }
 }
 
 void keyPressed() {
+  if(key == '`') {
+    resetWorld();
+  }
   if(key == 'a') {
     depthCount++;
   }
   if(key == '1') {
-    displayPolygonCandidates = !displayPolygonCandidates;
+    displayEdges = !displayEdges;
   }
   if(key == '2') {
+    displayNodes = !displayNodes;
+  }
+  if(key == '3') {
+    displayPentagonCandidates = !displayPentagonCandidates;
+  }
+  if(key == '4') {
     displayEdgeCandidates = !displayEdgeCandidates;
+  }
+  if(key == '5') {
+    displayPentagons = !displayPentagons;
   }
 }
 

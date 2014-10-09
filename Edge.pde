@@ -5,20 +5,23 @@ class Edge {
   Vec3D a;    // First point. Points are interchangable
   Vec3D b;    // Second point. Points are interchangable
   
-  color c;    // Color to draw the edge
-//  List<Pentagon> Pentagons;    // List of pentagons that contain this Edge
+  List<Pentagon> pentagons;    // List of pentagons that contain this Edge
   
   // Create a new edge
   Edge(Vec3D a_, Vec3D b_) {
     a = a_;
     b = b_;
     
-    c = color(0,0,0);
+    pentagons = new LinkedList<Pentagon>();
   }
   
   // Test if an edge touches (shares a common endpoint) with another edge
   // Returns the intersection point if they touch, or null if they do not
   Vec3D touches(Edge e) {
+    if(equals(e)) {
+      return null;
+    }
+    
     final float SMALL_AMOUNT = .0001; 
     
     if(a.distanceTo(e.a) < SMALL_AMOUNT |
